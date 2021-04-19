@@ -1,0 +1,3 @@
+The Biba model has two primary rules: the Simple Integrity Axiom and the * Integrity Axiom.
+• Simple Integrity Axiom: “No read down”; a subject at a specific clearance level cannot read data at a lower classification. 
+• * Integrity Axiom: “No write up”; a subject at a specific clearance level cannot write data to a higher classification. 
