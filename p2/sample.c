@@ -305,7 +305,7 @@ static int inode_has_perm(struct task_struct *task,
 	}
 
 /* YOUR CODE: do authorize */
-
+	rtn = has_perm(ssid, osid, ops);
 
 /* Then, use this code to print relevant denials: for our processes or on our objects */
 	if (( ssid && osid ) && rtn ) {
@@ -370,6 +370,7 @@ static int sample_bprm_set_security(struct linux_binprm *bprm)
 	struct inode *inode = bprm->file->f_dentry->d_inode;
 
 	/* YOUR CODE: Determine the label for the new process */
+	u32 osid = get_inode_sid(inode);
 
 /* if the inode's sid indicates trusted or untrusted, then set 
    task->security */
@@ -447,7 +448,12 @@ int sample_inode_setxattr (struct dentry *dentry, char *name, void *value, size_
 	}
 
 	/* YOUR CODE: Gather inputs for inode_has_perm */
-
+	inode = dentry->d_inode;
+	ssid = get_task_sid(current);
+	osid = get_inode_sid(inode);
+	
+	if (inode == NULL) 
+		return 0;
 
 /* record attribute setting request before authorization */
 	if (ssid && osid) {
@@ -488,7 +494,7 @@ int sample_inode_create (struct inode *inode, struct dentry *dentry,
 
 int sample_file_permission (struct file *file, int mask)
 {
-        struct inode *inode;
+    struct inode *inode;
 	struct vfsmount *mnt = (struct vfsmount *)NULL;
 	struct dentry *dentry = (struct dentry *)NULL;
 	int rtn;
@@ -500,13 +506,22 @@ int sample_file_permission (struct file *file, int mask)
         }
 
 	/* NULL file */
-	if (!file || !file->f_path.dentry) {
+	if (!file || !file->f_path.dentry) 
+	{
 		printk(KERN_WARNING "%s: no file by task of pid 0x%x\n",
 		       __FUNCTION__, current->pid);
 		return 0;
 	}
 
 	/* YOUR CODE: Collect arguments for call to inode_has_perm */
+	inode = file->f_dentry->d_inode;
+	mnt = file->f_vfsmnt;
+	dentry = file->f_dentry;
+
+//TODO
+	/* Fix kernel panic error: if inode is NULL, return 0 */ 
+	if (inode == NULL) return 0;
+//TODO
 
 	if ( current->security ) {  // ssid
 #if 0
@@ -729,11 +744,31 @@ static struct dentry *d_cwlite;
 static u8 a = 0;
 
 
-static size_t cwlite_read(struct file *filp, char __user *buffer, 
-				size_t count, loff_t *ppos)
+static size_t cwlite_read(struct file *filp, char __user *buffer, size_t count, loff_t *ppos)
 {
 	/* YOUR CODE: for reading the CW-Lite value from the kernel */
-
+	int value = (int)((0x10000000 & (u32)current->security) >> 28);
+//TODO
+#if 0
+	printk(KERN_INFO "%s: CW-Lite value %d\n", __FUNCTION__, value);
+#endif
+//TODO
+	switch (value) 
+	{
+	case 0:
+		if (copy_to_user(buffer, "0", count))
+			return -EFAULT;
+		break;
+	case 1:	
+		if (copy_to_user(buffer, "1", count))
+			return -EFAULT;
+		break;
+	default:
+		printk(KERN_INFO "%s: invalid CW-Lite value %d\n",
+                        __FUNCTION__, value);
+                return -EINVAL;
+                break;
+	}
 	return count;
 }
 
@@ -742,7 +777,25 @@ static ssize_t cwlite_write(struct file *filp, const char __user *buffer, size_t
 {
         int new_value;
 
-	/* YOUR CODE: for collecting value to write from user space */
+		/* YOUR CODE: for collecting value to write from user space */
+		char value[2];
+		
+		if (copy_from_user(value, buffer, count))
+        	return -EFAULT;
+//TODO
+#if 0
+        printk(KERN_INFO "%s: CW-Lite value %s\n", __FUNCTION__, value);
+#endif
+//TODO
+
+		if (value[0] == '0' || value[0] == '1')
+		new_value = (int)value[0] - 48;
+		else
+		{
+			printk(KERN_INFO "%s: invalid CW-Lite value %s\n", __FUNCTION__, value);
+            return -EINVAL;
+		}
+	
 
         // get current
         // set flag on task
@@ -763,7 +816,7 @@ static ssize_t cwlite_write(struct file *filp, const char __user *buffer, size_t
 		return -EINVAL;
 		break;
         }
-
+//TODO
 out:
         return count;
 }
@@ -778,25 +831,30 @@ static struct file_operations cwlite_ops = {
 
 static __init int sample_init(void)
 {
-        if (register_security (&sample_ops)) {
-                printk(KERN_INFO "Sample: Unable to register with kernel.\n");
-                return 0;
-        }
-
+    if (register_security (&sample_ops)) 
+	{
+        printk(KERN_INFO "Sample: Unable to register with kernel.\n");
+        return 0;
+    }
         printk(KERN_INFO "Sample:  Initializing.\n");
 
 	cwl_debugfs_root = debugfs_create_dir("cwl", NULL);
-        if (!cwl_debugfs_root) {
-        	printk(KERN_INFO "Sample: Creating debugfs 'cwl' dir failed\n");
-                return -ENOENT;
+    if (!cwl_debugfs_root) 
+	{
+    	printk(KERN_INFO "Sample: Creating debugfs 'cwl' dir failed\n");
+        return -ENOENT;
 	}
 
 	/* YOUR CODE: Create debugfs file "cwlite" under "cwl" directory */
+	d_cwlite = debugfs_create_file("cwlite", 0666, cwl_debugfs_root, NULL, &cwlite_ops);
+	if (!d_cwlite) {
+		printk(KERN_INFO "Sample: Creating debugfs 'cwlite' file failed\n");
+		goto Fail;
+	}
 
-        printk(KERN_INFO "Sample:  Debugfs created: cwl: 0x%x, cwlite: 0x%x.\n",
-		cwl_debugfs_root, d_cwl);
+    printk(KERN_INFO "Sample:  Debugfs created: cwl: 0x%x, cwlite: 0x%x.\n", cwl_debugfs_root, d_cwl);
 
-        return 0;
+    return 0;
 
 Fail:
         debugfs_remove(cwl_debugfs_root);
@@ -807,18 +865,15 @@ Fail:
 
 static __exit void sample_exit(void)
 {
-        printk(KERN_INFO "Sample: Exiting.\n");
+    printk(KERN_INFO "Sample: Exiting.\n");
 
 	debugfs_remove(d_cwlite);
 	debugfs_remove(cwl_debugfs_root);
-        unregister_security(&sample_ops);
+    unregister_security(&sample_ops);
 }
-
-
 
 module_init(sample_init);
 module_exit(sample_exit);
-
 
 MODULE_LICENSE("GPL");
 EXPORT_SYMBOL_GPL(sample_init);
