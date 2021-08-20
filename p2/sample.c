@@ -1,8 +1,4 @@
-/*
-* Sample LSM implementation
-*/
-
-//#include <linux/config.h>
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -139,7 +135,6 @@ static int has_perm(u32 ssid_full, u32 osid, u32 ops)
 		printk(KERN_WARNING "%s: 0x%x:0x%x:0x%x:0x%x\n",
 		       __FUNCTION__, ssid, cwl, osid, ops);
 #endif
-	/* YOUR CODE: CW-Lite Authorization Rules */
         if (ssid && osid)
 		///////////////////////////////////////////////////////////
 		/* Block untrusted process from modifying trusted object */
@@ -304,7 +299,7 @@ static int inode_has_perm(struct task_struct *task,
 			goto done;
 	}
 
-/* YOUR CODE: do authorize */
+/* do authorize */
 	rtn = has_perm(ssid, osid, ops);
 
 /* Then, use this code to print relevant denials: for our processes or on our objects */
@@ -369,7 +364,7 @@ static int sample_bprm_set_security(struct linux_binprm *bprm)
 {
 	struct inode *inode = bprm->file->f_dentry->d_inode;
 
-	/* YOUR CODE: Determine the label for the new process */
+	/* Determine the label for the new process */
 	u32 osid = get_inode_sid(inode);
 
 /* if the inode's sid indicates trusted or untrusted, then set 
@@ -447,7 +442,7 @@ int sample_inode_setxattr (struct dentry *dentry, char *name, void *value, size_
 		return -EPERM;
 	}
 
-	/* YOUR CODE: Gather inputs for inode_has_perm */
+	/* Gather inputs for inode_has_perm */
 	inode = dentry->d_inode;
 	ssid = get_task_sid(current);
 	osid = get_inode_sid(inode);
@@ -513,7 +508,7 @@ int sample_file_permission (struct file *file, int mask)
 		return 0;
 	}
 
-	/* YOUR CODE: Collect arguments for call to inode_has_perm */
+	/* Collect arguments for call to inode_has_perm */
 	inode = file->f_dentry->d_inode;
 	mnt = file->f_vfsmnt;
 	dentry = file->f_dentry;
@@ -746,7 +741,7 @@ static u8 a = 0;
 
 static size_t cwlite_read(struct file *filp, char __user *buffer, size_t count, loff_t *ppos)
 {
-	/* YOUR CODE: for reading the CW-Lite value from the kernel */
+	/*for reading the CW-Lite value from the kernel */
 	int value = (int)((0x10000000 & (u32)current->security) >> 28);
 //TODO
 #if 0
@@ -777,7 +772,7 @@ static ssize_t cwlite_write(struct file *filp, const char __user *buffer, size_t
 {
         int new_value;
 
-		/* YOUR CODE: for collecting value to write from user space */
+		/* for collecting value to write from user space */
 		char value[2];
 		
 		if (copy_from_user(value, buffer, count))
@@ -845,7 +840,7 @@ static __init int sample_init(void)
         return -ENOENT;
 	}
 
-	/* YOUR CODE: Create debugfs file "cwlite" under "cwl" directory */
+	/* Create debugfs file "cwlite" under "cwl" directory */
 	d_cwlite = debugfs_create_file("cwlite", 0666, cwl_debugfs_root, NULL, &cwlite_ops);
 	if (!d_cwlite) {
 		printk(KERN_INFO "Sample: Creating debugfs 'cwlite' file failed\n");
